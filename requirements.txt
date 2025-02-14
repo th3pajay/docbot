@@ -11,4 +11,4 @@ sentence-transformers
 transformers
 langchain==0.0.300
 pydantic==1.10.7
-chromadb
+chromadb==0.4.14
