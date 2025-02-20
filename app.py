@@ -1,3 +1,5 @@
+from itertools import chain
+
 # DocBot PDF Chatbot: An application to chat with PDF documents.
 # It allows users to upload PDFs, ask questions, and receive
 # summarized answers, along with text-to-speech and word cloud features.
@@ -70,6 +72,25 @@ def initialize_session_state():
 
 
 client = chromadb.Client()
+
+
+@st.cache_resource
+def load_embedding_model(embedding_model_name):
+    """Loads and caches the Sentence Transformer embedding model."""
+    return SentenceTransformer(embedding_model_name)
+
+
+@st.cache_resource
+def load_summarizer_model(summ_model_name):
+    """Loads and caches the summarization pipeline."""
+    return pipeline("summarization", model=summ_model_name)
+
+
+embedding_model = load_embedding_model(CFG["emb_model"])
+summarizer = load_summarizer_model(CFG["summ_model"])
+
+embedding_model = load_embedding_model(CFG["emb_model"])
+summarizer = load_summarizer_model(CFG["summ_model"])
 
 
 def transform_text(text, transformations=None):
@@ -279,17 +300,11 @@ def create_summary(
     if not context_segments:
         return None
     if isinstance(context_segments, list) and isinstance(context_segments[0], list):
-        context_segments = [
-            segment for sublist in context_segments for segment in sublist
-        ]
+        context_segments = list(chain.from_iterable(context_segments))
     context_text = " ".join(context_segments)
-    prompt = (
-        "Summarize the following document content to answer user questions in detail:\n\n"
-        f"Context:\n{context_text}\n\nDetailed Summary:"
-    )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        output = summarizer(prompt, max_length=max_words, min_length=min_words)
+        output = summarizer(context_text, max_length=max_words, min_length=min_words)
     return output[0]["summary_text"].strip()
 
 
@@ -399,7 +414,9 @@ if uploaded_pdf or load_url_button:
 
         elif load_url_button:
             st.session_state.pop("chat_history", None)
-            pdf_loaded_success_flag = load_pdf_from_url(pdf_url, st.session_state.db_coll)
+            pdf_loaded_success_flag = load_pdf_from_url(
+                pdf_url, st.session_state.db_coll
+            )
             st.session_state.pdf_uploaded = pdf_loaded_success_flag
 
         if pdf_loaded_success_flag:
